@@ -35,8 +35,9 @@ function geofield_field_widget_form(form, form_state, field, instance, langcode,
     
     // For a latitude/longitude widget, we create two text fields and a button
     // to get the current position and fill in the two text fields.
+    // 删除 onchange 和 _geofield_field_widget_form_change()
+    // 因为不能触发 onchange 属性 无法发送给 $('#' + input).val(value);
     if (instance.widget.type == 'geofield_latlon') {
-      var onchange = '_geofield_field_widget_form_change(this, \'' + items[delta].id + '\')';
       var lat_id = items[delta].id + '-lat';
       var lat = {
         id: lat_id,
@@ -44,8 +45,7 @@ function geofield_field_widget_form(form, form_state, field, instance, langcode,
         type: 'textfield',
         options: {
           attributes: {
-            id: lat_id,
-            onchange: onchange
+            id: lat_id
           }
         }
       };
@@ -56,8 +56,7 @@ function geofield_field_widget_form(form, form_state, field, instance, langcode,
         type: 'textfield',
         options: {
           attributes: {
-            id: lon_id,
-            onchange: onchange
+            id: lon_id
           }
         }
       };
@@ -71,7 +70,7 @@ function geofield_field_widget_form(form, form_state, field, instance, langcode,
         type: 'button',
         options: {
           attributes: {
-            onclick: '_geofield_field_widget_form_click(\'' + lat.id + '\', \'' + lon.id + '\')'
+            onclick: '_geofield_field_widget_form_click(\'' + lat.id + '\', \'' + lon.id + '\', \'' + items[delta].id + '\')'
           }
         }
       };
@@ -87,36 +86,19 @@ function geofield_field_widget_form(form, form_state, field, instance, langcode,
 }
 
 /**
- *
+ * 直接获取input 传递给 $('#' + input).val(value);
  */
-function _geofield_field_widget_form_change(textfield, input) {
-  try {
-    // Depending on which textfield just changed values, grab the other one as
-    // well, then build the lat,lon value for the hidden input.
-    var which = $(textfield).attr('id');
-    var other = which;
-    if (which.indexOf('-lat') != -1) { other = which.replace('-lat', '-lon'); }
-    else {
-      other = which.replace('-lon', '-lat');
-      var swap = other;
-      other = which;
-      which = swap;
-    }
-    var value = $('#' + which).val() + ',' + $('#' + other).val();
-    $('#' + input).val(value);
-  }
-  catch (error) { console.log('_geofield_field_widget_form_change - ' + error); }
-}
-
-/**
- *
- */
-function _geofield_field_widget_form_click(lat_id, lon_id) {
+function _geofield_field_widget_form_click(lat_id, lon_id, input) {
   try {
     navigator.geolocation.getCurrentPosition(
       function(position) {
-        $('#' + lat_id).val(position.coords.latitude);
-        $('#' + lon_id).val(position.coords.longitude);
+        var lat = position.coords.latitude;
+        var lon = position.coords.longitude;
+        $('#' + lat_id).val(lat);
+        $('#' + lon_id).val(lon);
+        
+        var value = lat + ',' + lon;
+        $('#' + input).val(value);
       },
       function(error) {
         console.log('_geofield_field_widget_form_click - getCurrentPosition - ' + error);
@@ -139,7 +121,8 @@ function geofield_assemble_form_state_into_field(entity_type, bundle,
     var coordinates = form_state_value.split(',');
     if (coordinates.length != 2) { return null; }
     // We don't want to use a key for this item's value.
-    field_key.use_key = false;
+    field_key.value = 'geom';
+    field_key.use_key = true;
     // Return the assembled value.
     return {
       lat: coordinates[0],
